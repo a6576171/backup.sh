@@ -22,9 +22,9 @@ timestamp()
 
 # final file vars
 
-db_name='your_db_name_here'
-db_user='your_db_username_here'
-db_pass='your_db_password_here'
+db_name='database_name'
+db_user='database_user'
+db_pass='database_password'
 
 home=/home/
 www=/var/www/
@@ -37,7 +37,7 @@ bkpfile=$bkpfolder/$nbkp #defines the backup path, with file name attached
 logfile=$bkpfolder/log.log #defines log file name and path
 include_sql=yes
 
-# backup_parameters='--add-drop-table --add-locks --extended-insert --single-transaction -quick' >>>>>>> I don't use parameters, myself.
+backup_parameters='--add-drop-table --complete-insert --extended-insert --single-transaction --quick --lock-tables=false'
 backup_command=mysqldump
 sql_bkpname=$db_name-$ntime.sql
 mysql_created_file_full_path=$mysql/$sql_bkpname
@@ -81,42 +81,41 @@ else
 	
 	timestamp
 	echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER].
-	
-	# create backup directory if it doesn't already exists; else, proceed.
-	mkdir $bkpfolder > /dev/null 2>&1
-	if [[ $? -eq 0 ]]
+		
+	if [ ! -d "$bkpfolder" ]
 	then
-		timestamp
-		echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER].	>> $logfile
-		timestamp
-		echo [$time2 $time3] [$s5] Session locked to this instance via [$lock] file. >> $logfile
-		timestamp
-		echo [$time2 $time3] [$s2] Backup directory does not seem to exist. >> $logfile
-		timestamp
-		echo [$time2 $time3] [$s3] Created directory [$bkpfolder/]. Moving on. >> $logfile
+		# create backup directory if it doesn't already exists; else, proceed.
+		mkdir $bkpfolder > /dev/null 2>&1
+		if [[ $? -eq 0 ]]
+		then
+			timestamp
+			echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER].	>> $logfile
+			timestamp
+			echo [$time2 $time3] [$s5] Session locked to this instance via [$lock] file. >> $logfile
+			timestamp
+			echo [$time2 $time3] [$s3] Backup directory does not seem to exist. Created directory at [$bkpfolder/]. Proceeding to backup. >> $logfile
+		fi
 	else
 		timestamp
-		echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER]. >> $logfile
-		timestamp
-		echo [$time2 $time3] [$s5] Session locked to this instance via [$lock] file. >> $logfile
-		timestamp
-		echo [$time2 $time3] [$s2] Backup directory at [$bkpfolder/] already exists. Moving on. >> $logfile
+		echo [$time2 $time3] [$s2] Backup directory at [$bkpfolder/] already exists. Proceeding to backup. >> $logfile
 	fi
 	
-	#Run SQL backup
+	# Run SQL backup
 	timestamp 
 	echo [$time2 $time3] [$s0] Running MYSQL dump for database [$db_name] at [$mysql_created_file_full_path]... >> $logfile 
 	
 	timestamp
 	echo [$time2 $time3] [$s5] Creating temporary directory for MYSQL dump at [$mysql]. >> $logfile
+	# COMMAND
 	mkdir $mysql > /dev/null 2>&1
-	if [[ $? -ne 1 ]]
+	
+	# if sql backup directory was created, proceed to backing up stuff.
+	if [[ -d "$mysql" ]]
 	then
 		timestamp
 		echo [$time2 $time3] [$s3] Directory [$mysql] created. >> $logfile
-		
-		# if sql backup directory was created, proceed to backing up stuff.
-		$backup_command -u $db_user -p$db_pass $db_name > $mysql_created_file_full_path
+		# COMMAND	
+		$backup_command -u $db_user -p$db_pass $db_name $backup_parameters > $mysql_created_file_full_path
 		
 		# if backup succeeds, include sql in final backup. Else, don't.
 		if [[ $? -ne 1 ]]
@@ -146,17 +145,18 @@ else
 		echo [$time2 $time3] [$s2] Will not backup MYSQL database due to errors. See log file for details.
 	fi
 		
-	# enumerate sources and make tarball of them all.
+	# Enumerate sources and make tarball of them all.
 	timestamp
-	echo [$time2 $time3] [$s5] Backing up [$home]... >> $logfile
-	timestamp
-	echo [$time2 $time3] [$s5] Backing up [$www]... >> $logfile
+	echo [$time2 $time3] [$s5] Adding to backup list: [$home]... >> $logfile
+	timestamp                            
+	echo [$time2 $time3] [$s5] Adding to backup list: [$www]... >> $logfile
 	
 	if [[ $include_sql -eq no ]]
 	then
 		timestamp
-		echo [$time2 $time3] [$s5] Backing up database [$db_name]... >> $logfile
+		echo [$time2 $time3] [$s5] Adding to backup list: [DATABASE_DUMP] for [$db_name]... >> $logfile
 	fi
+	
 	timestamp
 	echo [$time2 $time3] [$s5] Will create file [$nbkp]. Tarballing... >> $logfile
 
