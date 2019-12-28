@@ -23,7 +23,7 @@ timestamp()
 # final file vars
 
 db_name='database_name'
-db_user='database_user'
+db_user='database_username'
 db_pass='database_password'
 
 home=/home/
@@ -124,7 +124,7 @@ else
 			echo [$time2 $time3] [$s3] Backup from database [$db_name] created. >> $logfile
 			include_sql=yes
 			timestamp
-			echo [$time2 $time3] [$s2] Backup will include MYSQL dump in final file. >> $logfile
+			echo [$time2 $time3] [$s5] Backup will include MYSQL dump in final file. >> $logfile
 		else
 			timestamp
 			echo [$time2 $time3] [$s4] Could not create backup file at [$mysql_created_file_full_path]. Skipping MYSQL backup. >> $logfile
@@ -154,7 +154,7 @@ else
 	if [[ $include_sql -eq no ]]
 	then
 		timestamp
-		echo [$time2 $time3] [$s5] Adding to backup list: [DATABASE_DUMP] for [$db_name]... >> $logfile
+		echo [$time2 $time3] [$s5] Adding to backup list: backup for database [$db_name]... >> $logfile
 	fi
 	
 	timestamp
@@ -167,9 +167,12 @@ else
 	else
 		tar -cpzf $bkpfile $home > /dev/null 2>&1
 	fi
-	
+		
 	if [[ $? -ne 1 ]]
 		then
+			timestamp
+			echo [$time2 $time3] [$s5] Tarball created successfully at [$bkpfile]. >> $logfile
+		
 			if [[ $include_sql -eq no ]]
 				then
 				# if sql is included in final file:
@@ -202,7 +205,7 @@ else
 			fi
 		else
 			timestamp
-			echo [$time2 $time3] [$s4] Could not create backup file due to some unknown reason. >> $logfile
+			echo [$time2 $time3] [$s4] Could not create backup due to some unknown reason. >> $logfile
 	fi
 
 	#running removal of backup files found which are older than 7 days.
@@ -212,7 +215,7 @@ else
 	if [[ $? -ne 1 ]]
 	then 
 		timestamp
-		echo [$time2 $time3] [$s3] Removed old backup files. Maybe none. >> $logfile
+		echo [$time2 $time3] [$s3] Removed old backup files. >> $logfile
 	else
 		timestamp
 		echo [$time2 $time3] [$s4] Could not remove old backup files. >> $logfile
