@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# script for backing up server folders AND sql data
+# Script for backing up server directories AND sql data
 # It has a LOT of room for improvement, but it currently does meet my needs.
 # I'll update it as I go.
 # By Isaac Candido
@@ -21,24 +21,26 @@ timestamp()
 }
 
 # final file vars
+
+db_name='your_db_name_here'
+db_user='your_db_username_here'
+db_pass='your_db_password_here'
+
 home=/home/
 www=/var/www/
-mysql=/etc/mysql
+mysql=/etc/mysql/$db_name-backup
 timestamp
 bkpfolder=/var/backups/full_server_backup #defines the backup path, no file name attached
 lock=/var/backups/lo.ck #session lock file path
 nbkp=svrbkp_$ntime.tar.gz #defines the file name
 bkpfile=$bkpfolder/$nbkp #defines the backup path, with file name attached
 logfile=$bkpfolder/log.log #defines log file name and path
+include_sql=yes
 
-# database vars
-db_name='db_name'
-db_user='db_user'
-db_pass='db_pass'
 # backup_parameters='--add-drop-table --add-locks --extended-insert --single-transaction -quick' >>>>>>> I don't use parameters, myself.
 backup_command=mysqldump
-sql_bkpname=$db_name_mysql-$ntime.sql
-mysql_created_file_full_path=$bkpfolder/$sql_bkpname
+sql_bkpname=$db_name-$ntime.sql
+mysql_created_file_full_path=$mysql/$sql_bkpname
 
 # statuses, for logging purposes.
 s0="START"
@@ -49,21 +51,21 @@ s4="FAILED"
 s5="NOTICE"
 
 if [ "$(id -u)" -ne 0 ]; then
-	# Since the script accesses root-owned folders, it MUST be run as root.  
+	# Since the script accesses root-owned directories, it MUST be run as root.  
 	echo This script must be run as superuser. >&2
 	echo [$time2 $time3] [$s4] User [$USER] has no permissions to run script. Will exit now. >&2 >> ./errorlog.txt
 	exit 1
 else
-	if [ -f "$logfile" ]; then 
+	if [ -f "$lock" ]; then 
 		timestamp
 		echo [$time2 $time3] [$s4] Script still running. Wait until it finishes before running it again. >&2
-			if [ -f "$lock" ]; then
-				echo [$time2 $time3] [$s4] Script still running. Wait until it finishes before running it again. >> $logfile
+			if [ -f "$logfile" ]; then
+				echo [$time2 $time3] [$s4] Another instance is running. Wait until it finishes before running it again. >> $logfile
 				timestamp
 				echo [$time2 $time3] [$s4] If you are sure it is not running, see if [$lock] exists and delete it. >> $logfile
 				exit 1
 			else
-				echo [$time2 $time3] [$s4] Script still running. Wait until it finishes before running it again. >> ./errorlog.txt
+				echo [$time2 $time3] [$s4] Another instance is running. Wait until it finishes before running it again. >> ./errorlog.txt
 				timestamp
 				echo [$time2 $time3] [$s4] If you are sure it is not running, see if [$lock] exists and delete it. >> ./errorlog.txt
 				exit 1
@@ -77,7 +79,10 @@ else
 		echo 'If that is the case, you should check the logfile for errors and will have to remove the lo.ck file manually.' >> $lock
 	fi
 	
-	#create backup folder if it doesn't already exists; else, proceed.
+	timestamp
+	echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER].
+	
+	# create backup directory if it doesn't already exists; else, proceed.
 	mkdir $bkpfolder > /dev/null 2>&1
 	if [[ $? -eq 0 ]]
 	then
@@ -86,29 +91,59 @@ else
 		timestamp
 		echo [$time2 $time3] [$s5] Session locked to this instance via [$lock] file. >> $logfile
 		timestamp
-		echo [$time2 $time3] [$s2] Backup folder does not seem to exist. >> $logfile
+		echo [$time2 $time3] [$s2] Backup directory does not seem to exist. >> $logfile
 		timestamp
-		echo [$time2 $time3] [$s3] Created folder [$bkpfolder/]. Moving on. >> $logfile
+		echo [$time2 $time3] [$s3] Created directory [$bkpfolder/]. Moving on. >> $logfile
 	else
 		timestamp
 		echo [$time2 $time3] [$s0] Booting up backup routine. Started by user [$USER]. >> $logfile
 		timestamp
 		echo [$time2 $time3] [$s5] Session locked to this instance via [$lock] file. >> $logfile
 		timestamp
-		echo [$time2 $time3] [$s2] Backup folder at [$bkpfolder/] already exists. Moving on. >> $logfile
+		echo [$time2 $time3] [$s2] Backup directory at [$bkpfolder/] already exists. Moving on. >> $logfile
 	fi
 	
 	#Run SQL backup
 	timestamp 
-	echo [$time2 $time3] [$s0] Running MYSQL dump for database [$db_name] at [$bkpfolder/$sql_bkpname]... >> $logfile 
-	$backup_command -u $db_user -p$db_pass $db_name > $mysql_created_file_full_path
+	echo [$time2 $time3] [$s0] Running MYSQL dump for database [$db_name] at [$mysql_created_file_full_path]... >> $logfile 
+	
+	timestamp
+	echo [$time2 $time3] [$s5] Creating temporary directory for MYSQL dump at [$mysql]. >> $logfile
+	mkdir $mysql > /dev/null 2>&1
 	if [[ $? -ne 1 ]]
 	then
 		timestamp
-		echo [$time2 $time3] [$s3] Backup from database [$db_name] created. >> $logfile
+		echo [$time2 $time3] [$s3] Directory [$mysql] created. >> $logfile
+		
+		# if sql backup directory was created, proceed to backing up stuff.
+		$backup_command -u $db_user -p$db_pass $db_name > $mysql_created_file_full_path
+		
+		# if backup succeeds, include sql in final backup. Else, don't.
+		if [[ $? -ne 1 ]]
+		then
+			timestamp
+			echo [$time2 $time3] [$s3] Backup from database [$db_name] created. >> $logfile
+			include_sql=yes
+			timestamp
+			echo [$time2 $time3] [$s2] Backup will include MYSQL dump in final file. >> $logfile
+		else
+			timestamp
+			echo [$time2 $time3] [$s4] Could not create backup file at [$mysql_created_file_full_path]. Skipping MYSQL backup. >> $logfile
+			rm -rf $mysql
+			include_sql=no
+			timestamp
+			echo [$time2 $time3] [$s2] Will not backup MYSQL database due to errors. >> $logfile
+			timestamp
+			echo [$time2 $time3] [$s2] Will not backup MYSQL database due to errors. See log file for details.
+		fi
 	else
 		timestamp
-		echo [$time2 $time3] [$s4] Could not create backup file due to some unknown reason. Will proceed without it. >> $logfile
+		echo [$time2 $time3] [$s4] Could not create directory at [$mysql]. Skipping MYSQL backup. >> $logfile
+		include_sql=no
+		timestamp
+		echo [$time2 $time3] [$s2] Will not backup MYSQL database due to errors. >> $logfile
+		timestamp
+		echo [$time2 $time3] [$s2] Will not backup MYSQL database due to errors. See log file for details.
 	fi
 		
 	# enumerate sources and make tarball of them all.
@@ -116,30 +151,55 @@ else
 	echo [$time2 $time3] [$s5] Backing up [$home]... >> $logfile
 	timestamp
 	echo [$time2 $time3] [$s5] Backing up [$www]... >> $logfile
-	timestamp
-	echo [$time2 $time3] [$s5] Backing up database [$db_name]... >> $logfile
+	
+	if [[ $include_sql -eq no ]]
+	then
+		timestamp
+		echo [$time2 $time3] [$s5] Backing up database [$db_name]... >> $logfile
+	fi
 	timestamp
 	echo [$time2 $time3] [$s5] Will create file [$nbkp]. Tarballing... >> $logfile
 
-	# tarbal!
-	tar -cpzf $bkpfile $home $www $mysql_created_file_full_path > /dev/null 2>&1 >> $logfile 
+	# tarball!
+	if [[ $include_sql -eq no ]]
+	then 
+		tar -cpzf $bkpfile $home $www $mysql_created_file_full_path > /dev/null 2>&1
+	else
+		tar -cpzf $bkpfile $home > /dev/null 2>&1
+	fi
+	
 	if [[ $? -ne 1 ]]
 		then
-			# remove .sql file created upon backup routine since it's already tarballed - hopefully!
-			# Yes, this script "hopes" stuff will work. So do I.
-			timestamp
-			echo [$time2 $time3] [$s5] Attempting to remove SQL backup file at [$mysql_created_file_full_path]... >> $logfile
-			rm -rf $mysql_created_file_full_path
-			if [[ $? -ne 1 ]]
-			then 
+			if [[ $include_sql -eq no ]]
+				then
+				# if sql is included in final file:
+				# remove .sql file created upon backup routine since it's already tarballed - hopefully!
+				# Yes, this script "hopes" stuff will work. So do I.
 				timestamp
-				echo [$time2 $time3] [$s3] SQL dump file at [$mysql_created_file_full_path] removed successfully. >> $logfile
-			else
+				echo [$time2 $time3] [$s5] Attempting to remove SQL backup file at [$mysql_created_file_full_path]... >> $logfile
+				rm -rf $mysql_created_file_full_path
+				if [[ $? -ne 1 ]]
+				then 
+					timestamp
+					echo [$time2 $time3] [$s3] SQL dump file at [$mysql_created_file_full_path] removed successfully. >> $logfile
+				else
+					timestamp
+					echo [$time2 $time3] [$s4] Could not remove SQL dump file at [$mysql_created_file_full_path]. >> $logfile
+				fi
 				timestamp
-				echo [$time2 $time3] [$s4] Could not remove SQL dump file at [$mysql_created_file_full_path]. >> $logfile
-			fi	
-			timestamp
-			echo [$time2 $time3] [$s3] Backup [$nbkp] file created. >> $logfile
+				echo [$time2 $time3] [$s5] Attempting to remove SQL backup directory at [$mysql]... >> $logfile
+				rm -rf $mysql
+				if [[ $? -ne 1 ]]
+				then 
+					timestamp
+					echo [$time2 $time3] [$s3] SQL backup directory at [$mysql] removed successfully. >> $logfile
+				else
+					timestamp
+					echo [$time2 $time3] [$s4] Could not remove SQL backup directory at [$mysql]. >> $logfile
+				fi					
+				timestamp
+				echo [$time2 $time3] [$s3] Backup file [$nbkp] created. >> $logfile
+			fi
 		else
 			timestamp
 			echo [$time2 $time3] [$s4] Could not create backup file due to some unknown reason. >> $logfile
