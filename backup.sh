@@ -100,18 +100,14 @@ else
 	fi
 	
 	# Run packages list export.
-	# Very important!
-	# The list can be used to install the same packages in the next OS installation, to be a clone of this one.
-	# In order to install the packages in the new installation, run:
-	# sudo xargs -a packages_list.txt apt install
-	# but before you restore your packages, you gotta restore AND update apt directory.
-	# for user information, i will leave this info in a readme file.
+	# Read below.
 	echo 'Installed packages exported.' > /home/READ.ME
 	echo 'Very important!' >> /home/READ.ME
 	echo 'The list can be used to install the same packages in the next OS installation, to be a clone of this one.'>> /home/READ.ME
 	echo 'In order to install the packages in the new installation, run:'>> /home/READ.ME
 	echo 'sudo xargs -a packages_list.txt apt install' >> /home/READ.ME
 	echo 'But, before you restore your packages, you gotta restore apt directory AND update apt.' >> /home/READ.ME
+	# for user information, I will leave this info in a readme file.
 			
 	# so...
 	# Make a copy of the whole apt directory to /home.
