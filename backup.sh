@@ -99,6 +99,46 @@ else
 		echo [$time2 $time3] [$s2] Backup directory at [$bkpfolder/] already exists. Proceeding to backup. >> $logfile
 	fi
 	
+	# Run packages list export.
+	# Very important!
+	# The list can be used to install the same packages in the next OS installation, to be a clone of this one.
+	# In order to install the packages in the new installation, run:
+	# sudo xargs -a packages_list.txt apt install
+	# but before you restore your packages, you gotta restore AND update apt directory.
+	# for user information, i will leave this info in a readme file.
+	echo 'Installed packages exported.' > /home/READ.ME
+	echo 'Very important!' >> /home/READ.ME
+	echo 'The list can be used to install the same packages in the next OS installation, to be a clone of this one.'>> /home/READ.ME
+	echo 'In order to install the packages in the new installation, run:'>> /home/READ.ME
+	echo 'sudo xargs -a packages_list.txt apt install' >> /home/READ.ME
+	echo 'But, before you restore your packages, you gotta restore apt directory AND update apt.' >> /home/READ.ME
+			
+	# so...
+	# Make a copy of the whole apt directory to /home.
+	/bin/cp -rf /etc/apt/ /home/apt_backup/
+	
+	dpkg-query -f '${binary:Package}\n' -W > /home/packages_list.txt
+	if [ -f "/home/packages_list.txt" ]
+	then 
+		timestamp 
+		echo [$time2 $time3] [$s3] Exported installed packages list to "/home/packages_list.txt"... >> $logfile 
+	else
+		timestamp 
+		echo [$time2 $time3] [$s3] Could not create packages list in "/home/packages_list.txt". >> $logfile 
+	fi
+	
+	# Make a copy of the whole apt directory to /home.
+	/bin/cp -rf /etc/apt/ /home/apt_backup/
+	
+	if [ -d "/home/apt_backup/" ]
+	then 
+		timestamp 
+		echo [$time2 $time3] [$s3] Created a copy of your /etc/apt/ directory... >> $logfile 
+	else
+		timestamp 
+		echo [$time2 $time3] [$s3] Could not create a copy of your /etc/apt/ directory. >> $logfile 
+	fi
+	
 	# Run SQL backup
 	timestamp 
 	echo [$time2 $time3] [$s0] Running MYSQL dump for database [$db_name] at [$mysql_created_file_full_path]... >> $logfile 
